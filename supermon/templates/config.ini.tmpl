@@ -1,0 +1,105 @@
+[program:{{ programname }}]
+command={{ command }}
+{% if process_name is defined %}
+process_name={{ process_name }}
+{% endif %}
+{% if numprocs is defined %}
+numprocs={{ numprocs }}
+{% endif %}
+{% if directory is defined %}
+directory={{ directory }}
+{% endif %}
+{% if umask is defined %}
+umask={{ umask }}
+{% endif %}
+{% if priority is defined %}
+priority={{ priority }}
+{% endif %}
+{% if autostart is defined %}
+autostart={{ autostart|lower }}
+{% endif %}
+{% if autorestart is defined %}
+autorestart={{ autorestart }}
+{% endif %}
+{% if startsecs is defined %}
+startsecs={{ startsecs }}
+{% endif %}
+{% if startretries is defined %}
+startretries={{ startretries }}
+{% endif %}
+{% if exitcodes is defined %}
+{% if exitcodes is string %}
+exitcodes={{ exitcodes }}
+{% elif exitcodes is sequence %}
+exitcodes={{ exitcodes|join(',') }}
+{% else %}
+exitcodes={{ unknown_type_for_exitcodes }}
+{% endif %}
+{% endif %}
+{% if stopsignal is defined %}
+stopsignal={{ stopsignal }}
+{% endif %}
+{% if stopwaitsecs is defined %}
+stopwaitsecs={{ stopwaitsecs }}
+{% endif %}
+{% if stopasgroup is defined %}
+stopasgroup={{ stopasgroup|lower }}
+{% endif %}
+{% if killasgroup is defined %}
+killasgroup={{ killasgroup|lower }}
+{% endif %}
+{% if user is defined %}
+user={{ user }}
+{% endif %}
+{% if redirect_stderr is defined %}
+redirect_stderr={{ redirect_stderr|lower }}
+{% endif %}
+{% if stdout_logfile is defined %}
+stdout_logfile={{ stdout_logfile }}
+{% endif %}
+{% if stdout_logfile_maxbytes is defined %}
+stdout_logfile_maxbytes={{ stdout_logfile_maxbytes }}
+{% endif %}
+{% if stdout_logfile_backups is defined %}
+stdout_logfile_backups={{ stdout_logfile_backups }}
+{% endif %}
+{% if stdout_capture_maxbytes is defined %}
+stdout_capture_maxbytes={{ stdout_capture_maxbytes }}
+{% endif %}
+{% if stdout_events_enabled is defined %}
+stdout_events_enabled={{ stdout_events_enabled|lower }}
+{% endif %}
+{% if stderr_logfile is defined %}
+stderr_logfile={{ stderr_logfile }}
+{% endif %}
+{% if stderr_logfile_maxbytes is defined %}
+stderr_logfile_maxbytes={{ stderr_logfile_maxbytes }}
+{% endif %}
+{% if stderr_logfile_backups is defined %}
+stderr_logfile_backups={{ stderr_logfile_backups }}
+{% endif %}
+{% if stderr_capture_maxbytes is defined %}
+stderr_capture_maxbytes={{ stderr_capture_maxbytes }}
+{% endif %}
+{% if stderr_events_enabled is defined %}
+stderr_events_enabled={{ stderr_events_enabled|lower }}
+{% endif %}
+{#
+{% if environment is defined %}
+{% if environment is mapping %}
+{% set envstr = ','.join(key + '="%s"'%value for key, value in environment.iteritems()) %}
+environment={{ envstr }}
+{% else %}
+environment={{ unsupported_type_for_environment_expected_mapping }}
+{% endif %}
+{% endif %}
+#}
+{% if serverurl is defined %}
+serverurl={{ serverurl }}
+{% endif %}
+ 
+{% if schedule is defined %}
+[eventlistener:supervisor-cron-{{ programname }}]
+command=supervisor_cron -p "{{ programname }}:{{ schedule }}"
+events=TICK_60
+{% endif %}
