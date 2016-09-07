@@ -1,6 +1,8 @@
 from contextlib import contextmanager
 from jinja2 import Environment, PackageLoader
 
+_CONFIGFILE = None 
+
 class _Program(object):
     def __init__(self, name, command=None):
         self.programname = name
@@ -14,4 +16,16 @@ class _Program(object):
 
 @contextmanager
 def program(name, command=None):
-    yield _Program(name, command=command)
+    pgm = _Program(name, command=command)
+    yield pgm
+    if _CONFIGFILE:
+        _CONFIGFILE.write(str(pgm))
+
+@contextmanager
+def configfile(filename):
+    if _CONFIGFILE:
+        raise RuntimeError("Already have an open config file")
+    _CONFIGFILE=open(filename, 'w')
+    yield
+    _CONFIGFILE.close()
+    _CONFIGFILE = None
