@@ -86,45 +86,49 @@ class CronSpec(object):
                 (dt.day in self.day_of_month or dt.weekday() + 1 in self.day_of_week) and
                 (self.starttime <= dt.time() < self.endtime))
 
+def check_processes(rpc, config, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, test=False):
+    now = datetime.datetime.now()
+    infos = rpc.supervisor.getAllProcessInfo()
+    for info in infos:
+        pid = info['pid']
+        name = info['name']
+        group = info['group']
+
+        spec = None
+        if name in config.programs:
+            spec = config.programs[name]
+        elif group in config.groups:
+            spec = config.groups[name]
+        else:
+            stderr.write('IGNORING %s:%s\n'%(group, name))
+            continue
+
+        stderr.write('Testing %s:%s [%s] against %s\n'%(group, name, now, spec))
+        if spec.test(now):
+            if info['statename'] in ('STOPPED', 'EXITED'):
+                stderr.write('Starting %s:%s\n'%(group, name))
+                rpc.supervisor.startProcess(name)
+        elif info['statename'] in ('STARTING', 'RUNNING', 'BACKOFF'):
+            stderr.write('Stopping %s:%s\n'%(group, name))
+            rpc.supervisor.stopProcess(name)
+
 # pass in stdin / stdout so we can test
 def runforever(config, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, test=False):
     rpc = childutils.getRPCInterface(os.environ)
+	first_time = True
     while True:
-        headers, payload = childutils.listener.wait(stdin, stdout)
+        if not first_time:
+            headers, payload = childutils.listener.wait(stdin, stdout)
+            eventname = headers['eventname']
+            if eventname.startswith('TICK'):
+                check_processes(rpc, config, stdin=stdin, stdout=stdout, stderr=stderr, test=test)
 
-        if not headers['eventname'].startswith('TICK'):
             childutils.listener.ok(stdout)
-            if test:
-                break
-            continue
-
-        now = datetime.datetime.now()
-        infos = rpc.supervisor.getAllProcessInfo()
-        for info in infos:
-            pid = info['pid']
-            name = info['name']
-            group = info['group']
-
-            spec = None
-            if name in config.programs:
-                spec = config.programs[name]
-            elif group in config.groups:
-                spec = config.groups[name]
-            else:
-                stderr.write('IGNORING %s:%s\n'%(group, name))
-                continue
-
-            stderr.write('Testing %s:%s [%s] against %s\n'%(group, name, now, spec))
-            if spec.test(now):
-                if info['statename'] in ('STOPPED', 'EXITED'):
-                    stderr.write('Starting %s:%s\n'%(group, name))
-                    rpc.supervisor.startProcess(name)
-            elif info['statename'] in ('STARTING', 'RUNNING', 'BACKOFF'):
-                stderr.write('Stopping %s:%s\n'%(group, name))
-                rpc.supervisor.stopProcess(name)
+        else:
+            first_time = False
+            check_processes(rpc, config, stdin=stdin, stdout=stdout, stderr=stderr, test=test)
 
         stderr.flush()
-        childutils.listener.ok(stdout)
         if test:
             break
 
