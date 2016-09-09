@@ -25,9 +25,12 @@ autostart={{ each_program.autostart }}
 
 {% endfor %} {# each_program #}
 
-{% if programs|rejectattr("schedule", "undefined")|first is defined %}
-[eventlistener:supervisor-cron-{{ hostname }}]
-command=supervisor_cron {% for each_program in programs|rejectattr("schedule", "undefined") %}-p "{{ each_program.programname }}:{{ each_program.schedule }}" {% endfor %}
+{% for key, each_cron_block in cronblocks.iteritems() %}
+[eventlistener:supervisor-cron-{{ hostname }}-{{ loop.index0 }}]
+command=supervisor_cron {% for each_program in each_cron_block %}-p "{{ each_program.programname }}:{{ each_program.schedule.crontab }}"{% endfor %}
+{% if key[0] is defined %}   
+    --email {{ key[0] }} {% if key[1] is defined %} --subject {{ key[1] }} {% endif %}
+{% endif %}
 
 events=TICK_60
-{% endif %}
+{% endfor %}

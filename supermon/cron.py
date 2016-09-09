@@ -6,7 +6,7 @@ import sys
 from collections import namedtuple
 from supervisor import childutils
 
-Config = namedtuple('Config', ['programs', 'groups'])
+Config = namedtuple('Config', ['programs', 'groups', 'email', 'subject'])
 
 def parse_range_list(spec, range_min, range_max, default=None):
     def validate(val):
@@ -86,6 +86,14 @@ class CronSpec(object):
                 (dt.day in self.day_of_month or dt.weekday() + 1 in self.day_of_week) and
                 (self.starttime <= dt.time() < self.endtime))
 
+def mail(address, subject, body):
+    msg = 'To: %s\n'%address
+    msg += 'Subject: %s\n'%subject
+    msg += '\n'
+    msg += body
+    with os.popen('/usr/sbin/sendmail -t -i', 'w') as m:
+        m.write(msg)
+
 def check_processes(rpc, config, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, test=False):
     now = datetime.datetime.now()
     infos = rpc.supervisor.getAllProcessInfo()
@@ -108,14 +116,18 @@ def check_processes(rpc, config, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.
             if info['statename'] in ('STOPPED', 'EXITED'):
                 stderr.write('Starting %s:%s\n'%(group, name))
                 rpc.supervisor.startProcess(name)
+                if config.email:
+                    mail(config.email, config.subject, "Starting %s:%s")
         elif info['statename'] in ('STARTING', 'RUNNING', 'BACKOFF'):
             stderr.write('Stopping %s:%s\n'%(group, name))
+            if config.email:
+                mail(config.email, config.subject, "Stopping %s:%s"%(group, name))
             rpc.supervisor.stopProcess(name)
 
 # pass in stdin / stdout so we can test
 def runforever(config, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, test=False):
     rpc = childutils.getRPCInterface(os.environ)
-	first_time = True
+    first_time = True
     while True:
         if not first_time:
             headers, payload = childutils.listener.wait(stdin, stdout)
@@ -136,9 +148,11 @@ def main():
     parser = argparse.ArgumentParser(description='supermon.cron - event listener')
     parser.add_argument('-p', '--program', help='program to monitor', action='append')
     parser.add_argument('-g', '--group', help='group to monitor', action='append')
+    parser.add_argument('-m', '--email', help='email address to notify')
+    parser.add_argument('-s', '--subject', default='supervisor - cron', help='email subject line')
     args = parser.parse_args()
 
-    config = Config({}, {})
+    config = Config({}, {}, args.email, args.subject)
     if args.program:
         for program_spec in args.program:
             program_name, crontab = program_spec.split(':')
